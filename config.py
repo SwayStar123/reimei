@@ -40,7 +40,7 @@ elif "f64" in AE_HF_NAME:
 else:
     AE_CHANNELS = 4
 
-SIGLIP_HF_NAME = "google/siglip-so400m-patch14-384"
+SIGLIP_HF_NAME = "google/siglip2-so400m-patch16-512"
 SIGLIP_EMBED_DIM = 1152
 
 SEED = 42

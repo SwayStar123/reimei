@@ -76,9 +76,11 @@ class ReiMei(nn.Module):
         self.image_embedder = PatchEmbed(self.channels, self.embed_dim, self.patch_size)
         
         # Text embedding
+        self.siglip_norm = nn.RMSNorm(params.siglip_dim)
         self.siglip_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim*4, num_layers=1)
 
         # Vector (y) embedding
+        self.vec_norm = nn.RMSNorm(params.siglip_dim)
         self.vector_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim*4, num_layers=2)
 
         self.rope_embedder = EmbedND(dim=self.head_dim)
@@ -89,7 +91,8 @@ class ReiMei(nn.Module):
             token_mixer_params = TokenMixerParameters(
                 use_mmdit=params.use_mmdit,
                 use_ec=params.use_ec,
-                use_moe=params.use_moe,
+                # use_moe=params.use_moe,
+                use_moe=False,
                 embed_dim=self.embed_dim,
                 num_heads=params.num_heads,
                 num_layers=params.token_mixer_layers,
@@ -174,14 +177,14 @@ class ReiMei(nn.Module):
         patched_h, patched_w = height // ps_h, width // ps_w
 
         # Text embeddings
-        sig_txt = self.siglip_embedder(sig_txt)
+        sig_txt = self.siglip_embedder(self.siglip_norm(sig_txt))
         txt = sig_txt
 
         _, seq_len, _ = txt.shape
 
         # Vector embedding (timestep + vector_embeddings)
         time = self.time_embedder(time)
-        vec = self.vector_embedder(sig_vec) + time
+        vec = self.vector_embedder(self.vec_norm(sig_vec)) + time
 
         # Image embedding
         img = self.image_embedder(img)

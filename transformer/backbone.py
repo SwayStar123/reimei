@@ -30,7 +30,7 @@ def nearest_divisor(scaled_num_heads, embed_dim):
 class TransformerBackbone(nn.Module):
     def __init__(self, params: BackboneParams):
         super().__init__()
-        mf_min, mf_max = 1.0, 4.0
+        mf_min, mf_max = 1.0, 3.0
         self.use_mmdit = params.use_mmdit
         
         if params.use_mmdit:
@@ -57,7 +57,7 @@ class TransformerBackbone(nn.Module):
                 n_act = min(params.capacity_factor, float(n_exp))
 
             if params.use_mmdit:
-                if i < params.num_layers // 3: # First third uses DoubleStreamBlock
+                if i < params.num_layers // 5: # First fifth uses DoubleStreamBlock
                     self.double_layers.append(DoubleStreamBlock(
                         hidden_size=params.embed_dim,
                         num_heads=scaled_num_heads,
@@ -71,7 +71,7 @@ class TransformerBackbone(nn.Module):
                         use_moe=params.use_moe,
                         use_expert_choice=params.use_ec,
                     ))
-                else:  # Second two-thirds use SingleStreamBlock
+                else:  # Rest use SingleStreamBlock
                     self.single_layers.append(SingleStreamBlock(
                         hidden_size=params.embed_dim,
                         num_heads=scaled_num_heads,
