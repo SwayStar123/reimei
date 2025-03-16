@@ -16,6 +16,8 @@ class ReiMeiParameters:
     use_mmdit: bool = True
     use_ec: bool = False
     use_moe: bool = False
+    shared_mod: bool = False
+    shared_attn_projs: bool = False,
     channels: int = 32
     patch_size: tuple[int, int] = (1,1)
     embed_dim: int = 1152
@@ -76,12 +78,12 @@ class ReiMei(nn.Module):
         self.image_embedder = PatchEmbed(self.channels, self.embed_dim, self.patch_size)
         
         # Text embedding
-        self.siglip_norm = nn.RMSNorm(params.siglip_dim)
-        self.siglip_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim*4, num_layers=1)
+        self.siglip_norm = nn.LayerNorm(params.siglip_dim)
+        self.siglip_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim, num_layers=1)
 
         # Vector (y) embedding
-        self.vec_norm = nn.RMSNorm(params.siglip_dim)
-        self.vector_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim*4, num_layers=2)
+        self.vec_norm = nn.LayerNorm(params.siglip_dim)
+        self.vector_embedder = MLPEmbedder(params.siglip_dim, self.embed_dim, hidden_dim=self.embed_dim, num_layers=1)
 
         self.rope_embedder = EmbedND(dim=self.head_dim)
 
@@ -92,6 +94,7 @@ class ReiMei(nn.Module):
                 use_mmdit=params.use_mmdit,
                 use_ec=params.use_ec,
                 # use_moe=params.use_moe,
+                shared_mod=params.shared_mod,
                 use_moe=False,
                 embed_dim=self.embed_dim,
                 num_heads=params.num_heads,
@@ -100,6 +103,7 @@ class ReiMei(nn.Module):
                 capacity_factor=params.capacity_factor,
                 num_shared_experts=params.shared_experts,
                 exp_ratio=params.image_text_expert_ratio,
+                dropout=params.dropout,
             )
             self.token_mixer = TokenMixer(token_mixer_params)
         else:
@@ -110,6 +114,8 @@ class ReiMei(nn.Module):
             use_mmdit=params.use_mmdit,
             use_ec=params.use_ec,
             use_moe=params.use_moe,
+            shared_mod=params.shared_mod,
+            shared_attn_projs=params.shared_attn_projs,
             embed_dim=self.embed_dim,
             num_layers=params.num_layers,
             num_heads=params.num_heads,
@@ -177,14 +183,16 @@ class ReiMei(nn.Module):
         patched_h, patched_w = height // ps_h, width // ps_w
 
         # Text embeddings
-        sig_txt = self.siglip_embedder(self.siglip_norm(sig_txt))
+        sig_txt = self.siglip_norm(sig_txt)
+        sig_txt = self.siglip_embedder(sig_txt)
         txt = sig_txt
 
         _, seq_len, _ = txt.shape
 
         # Vector embedding (timestep + vector_embeddings)
         time = self.time_embedder(time)
-        vec = self.vector_embedder(self.vec_norm(sig_vec)) + time
+        sig_vec = self.vec_norm(sig_vec)
+        vec = self.vector_embedder(sig_vec) + time
 
         # Image embedding
         img = self.image_embedder(img)

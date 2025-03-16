@@ -5,16 +5,19 @@ from transformer.moe import EC_SparseMoeBlock
 from transformer.reimei import ReiMeiParameters, ReiMei
 # from transformer.moedit import SparseMoeBlock
 
-embed_dim = 3072
+embed_dim = 2048
+patch_size = (1,1)
 
 params = ReiMeiParameters(
     use_mmdit=True,
     use_ec=True,
-    use_moe=True,
+    use_moe=False,
+    shared_mod=True,
+    shared_attn_projs=True,
     channels=128,
-    patch_size=(1,1),
+    patch_size=patch_size,
     embed_dim=embed_dim,
-    num_layers=24,
+    num_layers=4,
     num_heads=(embed_dim // 128),
     siglip_dim=1152,
     num_experts=8,

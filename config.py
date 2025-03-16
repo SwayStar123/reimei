@@ -17,7 +17,7 @@ AE_SCALING_FACTOR = 0.4538 # f64c128-mix-1.0
 # AE_SHIFT_FACTOR = 0.8640247167934477 # eq-sdxl
 AE_SHIFT_FACTOR = 0.
 
-BS = 512
+BS = 200
 TRAIN_STEPS = 300_000
 MASK_RATIO = 0.75 # Percent to mask
 CFG_RATIO = 0.1 # Percent to drop
@@ -40,7 +40,7 @@ elif "f64" in AE_HF_NAME:
 else:
     AE_CHANNELS = 4
 
-SIGLIP_HF_NAME = "google/siglip2-so400m-patch16-512"
+SIGLIP_HF_NAME = "google/siglip-so400m-patch14-384"
 SIGLIP_EMBED_DIM = 1152
 
 SEED = 42

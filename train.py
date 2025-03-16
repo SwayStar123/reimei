@@ -26,6 +26,8 @@ from torch.optim.lr_scheduler import OneCycleLR, ExponentialLR
 import wandb
 # from torchmetrics.functional.multimodal import clip_score
 from transformers import SiglipModel, SiglipProcessor
+import lovely_tensors
+lovely_tensors.monkey_patch()
 
 DTYPE = torch.bfloat16
 
@@ -65,16 +67,19 @@ if __name__ == "__main__":
     # torch.set_float32_matmul_precision('high')
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    embed_dim = 1024
+    embed_dim = 2048
     patch_size = (1,1)
 
     params = ReiMeiParameters(
         use_mmdit=True,
         use_ec=True,
+        use_moe=False,
+        shared_mod=True,
+        shared_attn_projs=True,
         channels=AE_CHANNELS,
         patch_size=patch_size,
         embed_dim=embed_dim,
-        num_layers=8,
+        num_layers=4,
         num_heads=(embed_dim // 128),
         siglip_dim=SIGLIP_EMBED_DIM,
         num_experts=8,
@@ -83,7 +88,6 @@ if __name__ == "__main__":
         dropout=0.1,
         token_mixer_layers=1,
         image_text_expert_ratio=4,
-        use_moe=False,
     )
 
     accelerator = Accelerator()
@@ -95,19 +99,20 @@ if __name__ == "__main__":
     params_count = sum(p.numel() for p in model.parameters())
     print("Number of parameters: ", params_count)
 
-    wandb.init(project="ReiMei", config={
-        "params_count": params_count,
-        "dataset_name": DATASET_NAME,
-        "ae_hf_name": AE_HF_NAME,
-        "lr": LR,
-        "bs": BS,
-        "CFG_RATIO": CFG_RATIO,
-        "MASK_RATIO": MASK_RATIO,
-        "MAX_CAPTION_LEN": MAX_CAPTION_LEN,
-        "params": params,
-    })
+    if accelerator.is_main_process:
+        wandb.init(project="ReiMei", config={
+            "params_count": params_count,
+            "dataset_name": DATASET_NAME,
+            "ae_hf_name": AE_HF_NAME,
+            "lr": LR,
+            "bs": BS,
+            "CFG_RATIO": CFG_RATIO,
+            "MASK_RATIO": MASK_RATIO,
+            "MAX_CAPTION_LEN": MAX_CAPTION_LEN,
+            "params": params,
+        })
     
-    ds = get_dataset(BS, SEED + accelerator.process_index, device=device, dtype=DTYPE, num_workers=1)
+    ds = get_dataset(BS, SEED + accelerator.process_index, device=device, dtype=DTYPE, num_workers=2)
 
     optimizer = torch.optim.AdamW(model.parameters(), betas=(0.9, 0.95), lr=LR, weight_decay=0.01)
 
@@ -179,7 +184,7 @@ if __name__ == "__main__":
         siglip_vec = batch["siglip_vec"].to(device, dtype=DTYPE)
 
         img_mask = random_mask(bs, latents.shape[-2], latents.shape[-1], patch_size, mask_ratio=0.0).to(device, dtype=DTYPE)
-        cfg_mask = random_cfg_mask(bs, 0.1).to(device, dtype=DTYPE)
+        cfg_mask = random_cfg_mask(bs, CFG_RATIO).to(device, dtype=DTYPE)
 
         siglip_emb = siglip_emb.to(device, dtype=DTYPE) * cfg_mask.view(bs, 1, 1)
         siglip_vec = siglip_vec.to(device, dtype=DTYPE) * cfg_mask.view(bs, 1)
@@ -221,7 +226,7 @@ if __name__ == "__main__":
         if accelerator.is_main_process:
             wandb.log({"loss": loss.item()}, step=batch_idx)
 
-        del mse, loss, v, vtheta_h, latents_h, z_h
+        del mse, loss, v, vtheta, latents, vtheta_h, latents_h, z_h, siglip_emb, siglip_vec
 
         if batch_idx % 200 == 0:
             accelerator.wait_for_everyone()

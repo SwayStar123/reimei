@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from config import DATASET_NAME, DS_DIR_BASE, MAX_CAPTION_LEN, MODELS_DIR_BASE, SIGLIP_HF_NAME
 import random
-from transformers import SiglipTextModel, GemmaTokenizer
+from transformers import SiglipTextModel, SiglipTokenizer
 from datasets import load_dataset
 import time
 
@@ -66,7 +66,7 @@ class ShapeBatchingDataset(IterableDataset):
         while True:
             # if self.shuffle:
             #     self.dataset = self.dataset.shuffle(seed=self.seed, buffer_size=self.batch_size*self.buffer_multiplier)
-            self.dataloader = DataLoader(self.dataset, self.batch_size * 2, prefetch_factor=5, num_workers=self.num_workers, collate_fn=custom_collate, shuffle=self.shuffle)
+            self.dataloader = DataLoader(self.dataset, self.batch_size * 2, prefetch_factor=10, num_workers=self.num_workers, collate_fn=custom_collate, shuffle=self.shuffle)
             
             shape_batches = defaultdict(lambda: {'caption': [], 'ae_latent': []})
             for batch in self.dataloader:
@@ -124,7 +124,7 @@ def get_dataset(bs, seed, device, dtype, num_workers=16):
     ds = load_dataset(DATASET_NAME, cache_dir=f"{DS_DIR_BASE}/{DATASET_NAME}", num_proc=num_workers, split="train")
     # ds = ds.to_iterable_dataset(1000)
     siglip_model = SiglipTextModel.from_pretrained(SIGLIP_HF_NAME, cache_dir=f"{MODELS_DIR_BASE}/siglip").to(device, dtype)
-    siglip_tokenizer = GemmaTokenizer.from_pretrained(SIGLIP_HF_NAME, cache_dir=f"{MODELS_DIR_BASE}/siglip")
+    siglip_tokenizer = SiglipTokenizer.from_pretrained(SIGLIP_HF_NAME, cache_dir=f"{MODELS_DIR_BASE}/siglip")
 
     # ds = ShapeBatchingDataset(ds, bs, device, num_workers, shuffle=True, seed=seed)
     ds = ShapeBatchingDataset(ds, bs, siglip_tokenizer, siglip_model, device, num_workers, shuffle=True, seed=seed)

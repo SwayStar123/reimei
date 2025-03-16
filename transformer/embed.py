@@ -117,7 +117,7 @@ class OutputLayer(nn.Module):
     def __init__(self, in_dim: int, out_dim: int):
         super().__init__()
         self.norm_final = nn.LayerNorm(in_dim, elementwise_affine=False, eps=1e-6)
-        self.mlp = MLPEmbedder(in_dim, out_dim, hidden_dim=in_dim*4, num_layers=2)
+        self.mlp = MLPEmbedder(in_dim, out_dim, hidden_dim=in_dim*2, num_layers=2)
         self.adaLN_modulation = nn.Sequential(nn.GELU(), nn.Linear(in_dim, 2 * in_dim, bias=True))
 
     def forward(self, x: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
