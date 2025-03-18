@@ -65,6 +65,7 @@ if __name__ == "__main__":
     # datasets.config.HF_HUB_OFFLINE = 1
     # torch.set_float32_matmul_precision('high')
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = 1
 
     embed_dim = 2048
     patch_size = (1,1)
