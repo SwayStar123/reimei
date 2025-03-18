@@ -13,5 +13,10 @@ matplotlib
 protobuf
 sentencepiece
 tqdm
-torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
 nvidia-nccl-cu12==2.20.5
+
+# Pytorch
+-f https://download.pytorch.org/whl/cu121
+torch==2.4.1+cu121
+torchvision==0.19.1+cu121
+torchaudio==2.4.1
