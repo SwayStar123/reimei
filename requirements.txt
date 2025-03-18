@@ -16,7 +16,7 @@ tqdm
 nvidia-nccl-cu12==2.20.5
 
 # Pytorch
--f https://download.pytorch.org/whl/cu121
-torch==2.4.1+cu121
-torchvision==0.19.1+cu121
+-f https://download.pytorch.org/whl/cu124
+torch==2.4.1+cu124
+torchvision==0.19.1+cu124
 torchaudio==2.4.1
