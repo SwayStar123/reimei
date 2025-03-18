@@ -24,7 +24,6 @@ from diffusers import AutoencoderDC
 from diffusers import AutoencoderKL
 from torch.optim.lr_scheduler import OneCycleLR, ExponentialLR
 import wandb
-# from torchmetrics.functional.multimodal import clip_score
 from transformers import SiglipModel, SiglipProcessor
 import lovely_tensors
 lovely_tensors.monkey_patch()
@@ -32,7 +31,7 @@ lovely_tensors.monkey_patch()
 DTYPE = torch.bfloat16
 
 @torch.no_grad
-def sample_images(model, vae, ds, noise, prompts, sig_emb, sig_vec):
+def sample_images(model, vae, noise, sig_emb, sig_vec):
     def normalize_batch(images):
         min_vals = images.amin(dim=(1, 2, 3), keepdim=True)  # Min per image
         max_vals = images.amax(dim=(1, 2, 3), keepdim=True)  # Max per image
@@ -43,21 +42,21 @@ def sample_images(model, vae, ds, noise, prompts, sig_emb, sig_vec):
         return (images - min_vals) / scale
 
     # Use the stored embeddings
-    sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=50, cfg=1.0).to(device, dtype=DTYPE)
-    cfg_sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=50, cfg=6.0).to(device, dtype=DTYPE)
+    one_sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=1, cfg=5.0).to(device, dtype=DTYPE)
+    two_sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=2, cfg=5.0).to(device, dtype=DTYPE)
+    four_sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=4, cfg=5.0).to(device, dtype=DTYPE)
+    fifty_sampled_latents = model.sample(noise, sig_emb, sig_vec, sample_steps=50, cfg=5.0).to(device, dtype=DTYPE)
     
     # Decode latents to images
-    sampled_images = normalize_batch(vae.decode(sampled_latents).sample)
-    cfg_sampled_images = normalize_batch(vae.decode(cfg_sampled_latents).sample)
-
-    # Compute SigLIP scores
-    # scores = calculate_score(sampled_images, prompts)
-    # cfg_scores = calculate_score(cfg_sampled_images, prompts)
+    one_sampled_images = normalize_batch(vae.decode(one_sampled_latents).sample)
+    two_sampled_images = normalize_batch(vae.decode(two_sampled_latents).sample)
+    four_sampled_images = normalize_batch(vae.decode(four_sampled_latents).sample)
+    fifty_sampled_images = normalize_batch(vae.decode(fifty_sampled_latents).sample)
 
     # Log the sampled images
-    interleaved = torch.stack([sampled_images, cfg_sampled_images], dim=1).reshape(-1, *sampled_images.shape[1:])
+    interleaved = torch.stack([one_sampled_images, two_sampled_images, four_sampled_images, fifty_sampled_images], dim=1).reshape(-1, *one_sampled_images.shape[1:])
 
-    grid = torchvision.utils.make_grid(interleaved, nrow=2)
+    grid = torchvision.utils.make_grid(interleaved, nrow=4)
 
     return grid
 
@@ -180,22 +179,33 @@ if __name__ == "__main__":
         bs, c, h, w = latents.shape
         latents = (latents + AE_SHIFT_FACTOR) * AE_SCALING_FACTOR
 
+        # latents = latents.repeat(2, 1, 1, 1)
+
         siglip_emb = batch["siglip_emb"].to(device, dtype=DTYPE)
         siglip_vec = batch["siglip_vec"].to(device, dtype=DTYPE)
 
         img_mask = random_mask(bs, latents.shape[-2], latents.shape[-1], patch_size, mask_ratio=0.0).to(device, dtype=DTYPE)
+        # img_mask = img_mask.repeat(2, 1)
         cfg_mask = random_cfg_mask(bs, CFG_RATIO).to(device, dtype=DTYPE)
 
         siglip_emb = siglip_emb.to(device, dtype=DTYPE) * cfg_mask.view(bs, 1, 1)
         siglip_vec = siglip_vec.to(device, dtype=DTYPE) * cfg_mask.view(bs, 1)
 
+        # siglip_emb = siglip_emb.repeat(2, 1, 1)
+        # siglip_vec = siglip_vec.repeat(2, 1)
+
         txt_mask = random_mask(bs, siglip_emb.size(1), 1, (1, 1), mask_ratio=MASK_RATIO).to(device=device, dtype=DTYPE)
+        # txt_mask = txt_mask.repeat(2, 1)
+
+        z = torch.randn_like(latents, device=device, dtype=DTYPE)
+        # z = z[:bs].repeat(2, 1, 1, 1)
+
+        # bs = bs*2
 
         nt = torch.randn((bs,), device=device, dtype=DTYPE)
         t = torch.sigmoid(nt)
         texp = t.view([bs, 1, 1, 1]).to(device, dtype=DTYPE)
 
-        z = torch.randn_like(latents, device=device, dtype=DTYPE)
         x_t = (1 - texp) * latents + texp * z
 
         vtheta = model(x_t, t, siglip_emb, siglip_vec, img_mask, txt_mask)
@@ -212,9 +222,16 @@ if __name__ == "__main__":
         z_h = remove_masked_tokens(z_h, img_mask)
 
         v = z_h - latents_h
+        # x_0_approx = (z_h - vtheta_h)
 
-        mse = (((v - vtheta_h) ** 2)).mean()
-        loss = mse
+        # vtheta = vtheta_h[:bs//2]
+        # vtheta2 = vtheta_h[bs//2:]
+
+        mse = (((v - vtheta_h) ** 2)).mean(dim=(1,2))
+        # consistency_loss = (((vtheta - vtheta2) ** 2)).mean(dim=(1,2))
+        # mse = (((x_0_approx - latents_h) ** 2)).mean()
+
+        loss = mse.mean()
 
         optimizer.zero_grad()
         accelerator.backward(loss)
@@ -235,19 +252,11 @@ if __name__ == "__main__":
                     model.eval()
                     ae = ae.to(device)
 
-                    grid = sample_images(model, ae, ds, noise, ex_captions, ex_sig_emb, ex_sig_vec)
+                    grid = sample_images(model, ae, noise, ex_sig_emb, ex_sig_vec)
                     torchvision.utils.save_image(grid, f"logs/sampled_images_step_{batch_idx}.png")
 
-                    # wandb.log({"Siglip scores": scores.mean().item(), "Siglip scores with CFG": cfg_scores.mean().item()}, step=batch_idx)
-
                     del grid
-
-                    # Log 4 batch images
-                    # latents = latents[:4] / AE_SCALING_FACTOR
-                    # batch_imgs = ae.decode(latents).sample
-                    # grid = torchvision.utils.make_grid(batch_imgs, nrow=2, normalize=True, scale_each=True)
-                    # torchvision.utils.save_image(grid, f"logs/batch_images_step_{batch_idx}.png")
-
+                    
                     ae = ae.to("cpu")
 
                     model.train()
