@@ -51,7 +51,7 @@ def sample_images(model, vae, noise, sig_emb, sig_vec):
     # one_sampled_images = normalize_batch(vae.decode(one_sampled_latents).sample)
     # two_sampled_images = normalize_batch(vae.decode(two_sampled_latents).sample)
     # four_sampled_images = normalize_batch(vae.decode(four_sampled_latents).sample)
-    fifty_sampled_images = normalize_batch(vae.decode(fifty_sampled_latents).sample)
+    fifty_sampled_images = normalize_batch(vae.decode(fifty_sampled_latents).sample.clamp(-1, 1))
 
     # Log the sampled images
     # interleaved = torch.stack([one_sampled_images, two_sampled_images, four_sampled_images, fifty_sampled_images], dim=1).reshape(-1, *one_sampled_images.shape[1:])
