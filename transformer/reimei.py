@@ -8,7 +8,8 @@ from .utils import remove_masked_tokens, add_masked_tokens, unpatchify
 from .backbone import BackboneParams, TransformerBackbone
 from .token_mixer import TokenMixer, TokenMixerParameters
 import torch
-from config import AE_SCALING_FACTOR, AE_SHIFT_FACTOR
+# from config import AE_SCALING_FACTOR, AE_SHIFT_FACTOR
+from config import AE_SCALING_FACTORS
 from dataclasses import dataclass
 
 @dataclass
@@ -239,6 +240,8 @@ class ReiMei(nn.Module):
         dt = torch.tensor([dt] * b).to(z.device, torch.bfloat16).view([b, *([1] * len(z.shape[1:]))])
         images = [z]
 
+        scaling_factors = torch.tensor(AE_SCALING_FACTORS).to(z.device, torch.bfloat16).view(1, -1, 1, 1)
+
         for i in range(sample_steps, 0, -1):
             t = i / sample_steps
             t = torch.tensor([t] * b).to(z.device, torch.bfloat16)
@@ -253,4 +256,4 @@ class ReiMei(nn.Module):
             z = z - dt * vc
             images.append(z)
 
-        return (images[-1] / AE_SCALING_FACTOR) - AE_SHIFT_FACTOR
+        return images[-1] / scaling_factors

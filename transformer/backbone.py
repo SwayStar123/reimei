@@ -40,9 +40,9 @@ class TransformerBackbone(nn.Module):
         
         self.shared_attn_projs = params.shared_attn_projs
         if self.shared_attn_projs:
-            # if self.use_mmdit:
-            #     self.img_attn = SelfAttention(params.embed_dim, params.num_heads, dropout=params.dropout)
-            #     self.txt_attn = SelfAttention(params.embed_dim, params.num_heads, dropout=params.dropout)
+            if self.use_mmdit:
+                self.img_attn = SelfAttention(params.embed_dim, params.num_heads, dropout=params.dropout)
+                self.txt_attn = SelfAttention(params.embed_dim, params.num_heads, dropout=params.dropout)
             
             self.attn = SelfAttention(params.embed_dim, params.num_heads, dropout=params.dropout)
 
@@ -144,9 +144,9 @@ class TransformerBackbone(nn.Module):
             mod = self.mod
 
         if self.shared_attn_projs:
-            # if self.use_mmdit:
-            #     img_attn = self.img_attn
-            #     txt_attn = self.txt_attn
+            if self.use_mmdit:
+                img_attn = self.img_attn
+                txt_attn = self.txt_attn
             attn = self.attn
 
         for layer in self.double_layers:
