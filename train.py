@@ -32,31 +32,11 @@ DTYPE = torch.bfloat16
 
 @torch.no_grad
 def sample_images(model, vae, noise, sig_emb, sig_vec):
-    def normalize_batch(images):
-        min_vals = images.amin(dim=(1, 2, 3), keepdim=True)  # Min per image
-        max_vals = images.amax(dim=(1, 2, 3), keepdim=True)  # Max per image
-        
-        # Ensure no division by zero
-        scale = (max_vals - min_vals).clamp(min=1e-8)
-        
-        return (images - min_vals) / scale
-
-    # Use the stored embeddings
-    # one_sampled_latents = model.module.sample(noise, sig_emb, sig_vec, sample_steps=1, cfg=5.0).to(device, dtype=DTYPE)
-    # two_sampled_latents = model.module.sample(noise, sig_emb, sig_vec, sample_steps=2, cfg=5.0).to(device, dtype=DTYPE)
-    # four_sampled_latents = model.module.sample(noise, sig_emb, sig_vec, sample_steps=4, cfg=5.0).to(device, dtype=DTYPE)
     fifty_sampled_latents = model.module.sample(noise, sig_emb, sig_vec, sample_steps=50, cfg=5.0).to(device, dtype=DTYPE)
     
-    # Decode latents to images
-    # one_sampled_images = normalize_batch(vae.decode(one_sampled_latents).sample)
-    # two_sampled_images = normalize_batch(vae.decode(two_sampled_latents).sample)
-    # four_sampled_images = normalize_batch(vae.decode(four_sampled_latents).sample)
-    fifty_sampled_images = normalize_batch(vae.decode(fifty_sampled_latents).sample.clamp(-1, 1))
+    fifty_sampled_images = vae.decode(fifty_sampled_latents).sample.clamp(-1, 1)
 
-    # Log the sampled images
-    # interleaved = torch.stack([one_sampled_images, two_sampled_images, four_sampled_images, fifty_sampled_images], dim=1).reshape(-1, *one_sampled_images.shape[1:])
-
-    grid = torchvision.utils.make_grid(fifty_sampled_images, nrow=4, normalize=True, scale_each=True)
+    grid = torchvision.utils.make_grid(fifty_sampled_images, nrow=4, normalize=True, scale_each=True, value_range=(-1, 1))
 
     return grid
 
@@ -218,16 +198,16 @@ if __name__ == "__main__":
         os.makedirs("logs", exist_ok=True)
         os.makedirs("models", exist_ok=True)
 
-        noise = torch.randn(12, AE_CHANNELS, 4, 4).to(device, dtype=DTYPE)
+        noise = torch.randn(16, AE_CHANNELS, 4, 4).to(device, dtype=DTYPE)
         example_batch = next(iter(ds))
 
         # example_latents = example_batch.to(device, dtype=DTYPE)[:4]
 
-        example_latents = example_batch["ae_latent"][:12].to(device, dtype=DTYPE)
+        example_latents = example_batch["ae_latent"][:16].to(device, dtype=DTYPE)
         # ex_sig_emb = example_batch["siglip_emb"][:4].to(device, dtype=DTYPE)
         # ex_sig_vec = example_batch["siglip_vec"][:4].to(device, dtype=DTYPE)
 
-        example_captions = example_batch["caption"][:12]
+        example_captions = example_batch["caption"][:16]
         
         with torch.no_grad():
             example_ground_truth = ae.decode(example_latents).sample
@@ -241,7 +221,7 @@ if __name__ == "__main__":
 
         del grid, example_ground_truth, example_latents
 
-        ex_captions = ["a cheeseburger on a white plate", "a bunch of bananas on a wooden table", "a white tea pot on a wooden table", "an erupting volcano with lava pouring out", "the aurora borealis above a snow covered forest", "bright blue sky with clouds", "a red apple on a wooden table", "a field of green grass with a snowcapped mountain in the background", "a blonde girl with her dog on the beach", "a red car and a blue car waiting at a red light signal", "a sleeping black cat by a window", "an astronaut riding a horse"]
+        ex_captions = ["a cheeseburger on a white plate", "a bunch of bananas on a wooden table", "a white tea pot on a wooden table", "an erupting volcano with lava pouring out", "the aurora borealis northern lights fill the starry night sky with a bright glow above a snow covered forest with mountains in the background", "a sunflower wearing sunglasses, cloudy blue sky background", "a red apple on a wooden table", "a field of green grass with a snowcapped mountain in the background", "a blonde girl chasing after her dog on a beach", "a red car and a blue car waiting at a red light signal", "a sleeping black cat by a window", "an astronaut riding a horse", "a smilling couple dressed in formal wedding attire", "The eiffel tower standing atop an icy glacier in the north american arctic", "An unlit fireplace with a TV above it. The TV shows a lion", "a black car in the middle of a beautiful endless field of white flowers."]
         ex_sig_emb, ex_sig_vec = ds.encode_siglip(ex_captions)
 
         ae = ae.to("cpu")
@@ -275,7 +255,6 @@ if __name__ == "__main__":
         t = torch.sigmoid(nt)
         texp = t.view([bs, 1, 1, 1]).to(device, dtype=DTYPE)
 
-        # correction_factor = 1 / torch.sqrt(1 - 2*texp*(1-texp))
         x_t = (1 - texp) * latents + texp * z
 
         vtheta = model(x_t, t, siglip_emb, siglip_vec, img_mask, txt_mask)
@@ -291,7 +270,7 @@ if __name__ == "__main__":
         latents_h = remove_masked_tokens(latents_h, img_mask)
         z_h = remove_masked_tokens(z_h, img_mask)
 
-        v = (z_h - latents_h)
+        v = z_h - latents_h
 
         mse = (((v - vtheta_h) ** 2)).mean(dim=(1,2))
 
@@ -332,12 +311,12 @@ if __name__ == "__main__":
 
                     model.train()
 
-        if ((batch_idx % (TRAIN_STEPS//30)) == 0) and batch_idx != 0:
+        if ((batch_idx % (TRAIN_STEPS//20)) == 0) and batch_idx != 0:
             accelerator.wait_for_everyone()
             if accelerator.is_main_process:
                 unwrapped_model = accelerator.unwrap_model(model)
                 unwrapped_optimizer = accelerator.unwrap_model(optimizer)
-                model_save_path = f"models/reimei_model_and_optimizer_{batch_idx//(TRAIN_STEPS//30)}_f32.pt"
+                model_save_path = f"models/reimei_model_and_optimizer_{batch_idx//(TRAIN_STEPS//20)}_f32.pt"
                 torch.save({
                     'global_step': batch_idx,
                     'model_state_dict': unwrapped_model.state_dict(),
