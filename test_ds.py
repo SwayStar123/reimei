@@ -28,7 +28,7 @@ if __name__ == "__main__":
     #     print("std dev, mean", torch.std_mean(x))
     #     t = time.time()
 
-    ds = get_dataset(512, 0, "cuda", torch.bfloat16, num_workers=4)
+    ds = get_dataset(512, 0, "cuda", torch.bfloat16, num_workers=8)
 
     t = time.time()
     for row in ds:

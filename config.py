@@ -5,9 +5,9 @@
 # DATASET_NAME = "g-ronimo/IN1k96-augmented-latents_dc-ae-f32c32-sana-1.0"
 # DATASET_NAME = "SwayStar123/imagenet1k_eqsdxlvae_latents"
 # DATASET_NAME = "g-ronimo/imagenet1k_eqsdxlvae_latents"
-DATASET_NAME = "SwayStar123/imagenet1k_dcae-f64-latents"
-DS_DIR_BASE = "../../datasets"
-MODELS_DIR_BASE = "../../models"
+DATASET_NAME = "SwayStar123/preprocessed_DCAE-f64_pd12m-full"
+DS_DIR_BASE = "/mnt/data/dataset"
+MODELS_DIR_BASE = "/mnt/data/models"
 AE_SCALING_FACTOR = 0.4538 # f64c128-mix-1.0
 # AE_SCALING_FACTOR = 0.13025 # sdxl-vae-fp16-fix
 # AE_SCALING_FACTOR = 0.3189 # f32c32-in-1.0
@@ -17,7 +17,7 @@ AE_SCALING_FACTOR = 0.4538 # f64c128-mix-1.0
 # AE_SHIFT_FACTOR = 0.8640247167934477 # eq-sdxl
 AE_SHIFT_FACTOR = 0.
 
-BS = 200
+BS = 6144
 TRAIN_STEPS = 300_000
 MASK_RATIO = 0.75 # Percent to mask
 CFG_RATIO = 0.1 # Percent to drop
