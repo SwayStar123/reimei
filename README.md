@@ -10,7 +10,7 @@
 
 ---
 
-Training and inference code for reimei, a diffusion model for image generation.
+Training and inference code for reimei, a diffusion model for image generation. Optimized for being highly efficient to train. Cost roughly $6000 to pretrain. 
 
 
 Model features
